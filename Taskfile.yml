@@ -1,0 +1,12 @@
+version: '3'
+tasks:
+  build:
+    cmds:
+      - GOOS=js GOARCH=wasm garble build -o ./static/vm.wasm ./game/main.go
+      - rm -rf ./static/vm.br.wasm
+      - brotli -q 11 ./static/vm.wasm -o ./static/vm.br.wasm
+      - go build -o ./main main.go
+  dev:
+    cmds:
+      - GOOS=js GOARCH=wasm garble build -o ./static/vm.wasm ./game/main.go
+      - go run ./main.go
