@@ -1,0 +1,26 @@
+package routes
+
+import (
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+// Route struct
+type Route struct {
+	URI          string
+	Method       string
+	Handler      func(w http.ResponseWriter, r *http.Request)
+	AuthRequired bool
+}
+
+// SetupRoutesWithMiddlewares config routes with middlewares
+func SetupRoutesWithMiddlewares(router *mux.Router, middlewares ...func(http.HandlerFunc) http.HandlerFunc) *mux.Router {
+	var routes = []Route{}
+	routes = append(routes, NewPlayRoutes([32]byte{}, [32]byte{}, nil).routes...)
+
+	for _, route := range routes {
+		router.HandleFunc(route.URI, route.Handler).Methods(route.Method)
+	}
+	return router
+}

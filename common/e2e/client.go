@@ -71,7 +71,7 @@ func (c *Client) saveSessionToLocalStorage() {
 // ExchangeKeysWithServer выполняет обмен ключами с сервером.
 func (c *Client) ExchangeKeysWithServer() error {
 	clientPublicKeyHex := hex.EncodeToString(c.PublicKey[:])
-	resp, err := http.PostForm(c.ServerURL+"/exchange-keys", url.Values{
+	resp, err := http.PostForm(c.ServerURL+"/key-exchange", url.Values{
 		"ClientPublicKey": {clientPublicKeyHex},
 	})
 	if err != nil {

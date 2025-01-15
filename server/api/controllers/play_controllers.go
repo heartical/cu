@@ -1,39 +1,44 @@
-package main
+package controllers
 
 import (
-	"cu/common/assets"
-	"cu/common/cryptography"
 	"encoding/hex"
 	"encoding/json"
-	"html/template"
 	"net/http"
+	"text/template"
 	"time"
 
+	"cu/common/assets"
+	"cu/common/cryptography"
+	"cu/server/api/security"
+
+	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
-// //go:embed templates/index.html
-// var templateFS embed.FS
-
-// Server представляет серверное приложение.
-type Server struct {
+// PlayController представляет контроллер для обработки запросов.
+type PlayController struct {
 	privateKey [32]byte
 	publicKey  [32]byte
-	sessions   SessionStorage
+	sessions   *security.SessionStorage
+	db         *badger.DB
 }
 
-// handleNotFound обрабатывает запросы к несуществующим страницам.
-func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/game/game-not-found", http.StatusFound)
+// NewPlayController создает новый контроллер.
+func NewPlayController(privateKey, publicKey [32]byte, db *badger.DB) *PlayController {
+	return &PlayController{
+		privateKey: privateKey,
+		publicKey:  publicKey,
+		sessions:   security.NewSessionStorage(db),
+		db:         db,
+	}
 }
 
-// handleIndex обрабатывает запросы к главной странице.
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+// PageRequest обрабатывает запрос на отображение страницы.
+func (pc *PlayController) PageRequest(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	roomID := vars["room_id"]
 
-	// Используем встроенный файл index.html
 	tmpl, err := template.ParseFS(assets.TemplateFS, "templates/index.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -46,8 +51,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleKeyExchange обрабатывает обмен ключами с клиентом.
-func (s *Server) handleKeyExchange(w http.ResponseWriter, r *http.Request) {
+// KeyExchangeRequest обрабатывает обмен ключами с клиентом.
+func (pc *PlayController) KeyExchangeRequest(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to parse form", http.StatusBadRequest)
 		return
@@ -63,7 +68,7 @@ func (s *Server) handleKeyExchange(w http.ResponseWriter, r *http.Request) {
 	var clientPublicKey [32]byte
 	copy(clientPublicKey[:], clientPublicKeyBytes)
 
-	baseKey, err := cryptography.ComputeSharedSecret(s.privateKey, clientPublicKey)
+	baseKey, err := cryptography.ComputeSharedSecret(pc.privateKey, clientPublicKey)
 	if err != nil {
 		http.Error(w, "Unable to compute shared secret", http.StatusInternalServerError)
 		return
@@ -82,7 +87,7 @@ func (s *Server) handleKeyExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sessions.SaveSession(&ServerSession{
+	pc.sessions.SaveSession(&security.ServerSession{
 		AccessKey: accessKey,
 		LastUsed:  time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
@@ -91,16 +96,16 @@ func (s *Server) handleKeyExchange(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"ServerPublicKey": hex.EncodeToString(s.publicKey[:]),
+		"ServerPublicKey": hex.EncodeToString(pc.publicKey[:]),
 		"SessionID":       sessionID,
 	})
 }
 
 // validateEAPI проверяет валидность EAPI для данной сессии.
-func (s *Server) validateEAPI(sessionID, receivedEAPI string) bool {
-	session, err := s.sessions.GetSession(sessionID)
+func (pc *PlayController) validateEAPI(sessionID, receivedEAPI string) bool {
+	session, err := pc.sessions.GetSession(sessionID)
 	if err != nil || time.Now().After(session.ExpiresAt) {
-		s.sessions.DeleteSession(sessionID)
+		pc.sessions.DeleteSession(sessionID)
 		return false
 	}
 
@@ -116,8 +121,8 @@ func (s *Server) validateEAPI(sessionID, receivedEAPI string) bool {
 	return true
 }
 
-// handleTunnel обрабатывает запросы через защищенный туннель.
-func (s *Server) handleTunnel(callback func(string) string) http.HandlerFunc {
+// ActionRequest обрабатывает запросы через защищенный туннель.
+func (pc *PlayController) ActionRequest(callback func(string) string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Unable to parse form", http.StatusBadRequest)
@@ -127,12 +132,12 @@ func (s *Server) handleTunnel(callback func(string) string) http.HandlerFunc {
 		sessionID := r.FormValue("SessionID")
 		eapi := r.FormValue("EAPI")
 
-		if !s.validateEAPI(sessionID, eapi) {
+		if !pc.validateEAPI(sessionID, eapi) {
 			http.Error(w, "Invalid SessionID or EAPI", http.StatusUnauthorized)
 			return
 		}
 
-		session, err := s.sessions.GetSession(sessionID)
+		session, err := pc.sessions.GetSession(sessionID)
 		if err != nil {
 			http.Error(w, "Invalid SessionID", http.StatusUnauthorized)
 			return
