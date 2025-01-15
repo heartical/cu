@@ -7,40 +7,46 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+// SpriteSize представляет размер спрайта в целых числах.
 type SpriteSize struct {
-	W, H int
+	Width  int
+	Height int
 }
 
+// SpriteSizeF представляет размер спрайта в числах с плавающей точкой.
 type SpriteSizeF struct {
-	W, H float64
+	Width  float64
+	Height float64
 }
 
-// Sprite is a sprite that can be drawn to the screen.
-// It can be animated by changing the current frame.
+// Sprite представляет спрайт, состоящий из нескольких кадров.
 type Sprite struct {
-	frames             []*image.Rectangle
-	image              *ebiten.Image
-	subImages          []*ebiten.Image
-	size               SpriteSize
-	sizeF              SpriteSizeF
-	length             int
-	flippedH, flippedV bool
-	op                 *ebiten.DrawImageOptions
-	shaderOp           *ebiten.DrawRectShaderOptions
+	frames    []*image.Rectangle
+	image     *ebiten.Image
+	subImages []*ebiten.Image
+	size      SpriteSize
+	sizeF     SpriteSizeF
+	length    int
+	flippedH  bool
+	flippedV  bool
+	op        *ebiten.DrawImageOptions
+	shaderOp  *ebiten.DrawRectShaderOptions
 }
 
-// NewSprite returns a new sprite.
+// NewSprite создает новый спрайт на основе изображения и кадров.
 func NewSprite(img *ebiten.Image, frames []*image.Rectangle) *Sprite {
 	subImages := make([]*ebiten.Image, len(frames))
 	for i, frame := range frames {
 		subImages[i] = img.SubImage(*frame).(*ebiten.Image)
 	}
-	size := SpriteSize{0, 0}
-	sizeF := SpriteSizeF{0, 0}
+
+	size := SpriteSize{}
+	sizeF := SpriteSizeF{}
 	if len(frames) > 0 {
-		size = SpriteSize{frames[0].Dx(), frames[0].Dy()}
-		sizeF = SpriteSizeF{float64(frames[0].Dx()), float64(frames[0].Dy())}
+		size = SpriteSize{Width: frames[0].Dx(), Height: frames[0].Dy()}
+		sizeF = SpriteSizeF{Width: float64(frames[0].Dx()), Height: float64(frames[0].Dy())}
 	}
+
 	return &Sprite{
 		frames:    frames,
 		image:     img,
@@ -53,93 +59,78 @@ func NewSprite(img *ebiten.Image, frames []*image.Rectangle) *Sprite {
 	}
 }
 
-// Size returns the size of the sprite.
-func (spr *Sprite) Size() (int, int) {
-	return spr.size.W, spr.size.H
+// Size возвращает размер спрайта.
+func (s *Sprite) Size() (int, int) {
+	return s.size.Width, s.size.Height
 }
 
-// Width returns the width of the sprite.
-func (spr *Sprite) Width() int {
-	return spr.size.W
+// Width возвращает ширину спрайта.
+func (s *Sprite) Width() int {
+	return s.size.Width
 }
 
-// W is a shortcut for Width().
-func (spr *Sprite) W() int {
-	return spr.Width()
+// Height возвращает высоту спрайта.
+func (s *Sprite) Height() int {
+	return s.size.Height
 }
 
-// Height returns the height of the sprite.
-func (spr *Sprite) Height() int {
-	return spr.size.H
+// Length возвращает количество кадров спрайта.
+func (s *Sprite) Length() int {
+	return s.length
 }
 
-// H is a shortcut for Height().
-func (spr *Sprite) H() int {
-	return spr.Height()
+// RandomIndex возвращает случайный индекс кадра.
+func (s *Sprite) RandomIndex() int {
+	return rand.Intn(s.length)
 }
 
-// Length returns the number of frames.
-func (spr *Sprite) Length() int {
-	return spr.length
+// LoopIndex возвращает индекс кадра с учетом зацикливания.
+func (s *Sprite) LoopIndex(index int) int {
+	return index % s.length
 }
 
-// RandomIndex returns random index of the sprite
-func (spr *Sprite) RandomIndex() int {
-	return rand.Intn(spr.length)
+// IsEnd проверяет, является ли индекс последним кадром.
+func (s *Sprite) IsEnd(index int) bool {
+	return index >= s.length-1
 }
 
-// LoopIndex returns loop index of the sprite.
-func (spr *Sprite) LoopIndex(index int) int {
-	if index >= spr.length {
-		return index % spr.length
-	}
-	return index
+// FlipH переключает горизонтальное отражение спрайта.
+func (s *Sprite) FlipH() {
+	s.flippedH = !s.flippedH
 }
 
-// IsEnd returns true if the current frame is the last frame.
-func (spr *Sprite) IsEnd(index int) bool {
-	return index >= spr.length-1
+// FlipV переключает вертикальное отражение спрайта.
+func (s *Sprite) FlipV() {
+	s.flippedV = !s.flippedV
 }
 
-// FlipH flips the sprite horizontally.
-func (spr *Sprite) FlipH() {
-	spr.flippedH = !spr.flippedH
+// SetFlipH устанавливает горизонтальное отражение спрайта.
+func (s *Sprite) SetFlipH(flipH bool) {
+	s.flippedH = flipH
 }
 
-// FlipV flips the sprite vertically.
-func (spr *Sprite) FlipV() {
-	spr.flippedV = !spr.flippedV
+// SetFlipV устанавливает вертикальное отражение спрайта.
+func (s *Sprite) SetFlipV(flipV bool) {
+	s.flippedV = flipV
 }
 
-// SetFlipH flips the sprite horizontally.
-func (spr *Sprite) SetFlipH(flipH bool) {
-	spr.flippedH = flipH
-}
-
-// SetFlipV flips the sprite vertically.
-func (spr *Sprite) SetFlipV(flipV bool) {
-	spr.flippedV = flipV
-}
-
-// Draw draws the current frame with the specified options.
-func (spr *Sprite) Draw(screen *ebiten.Image, index int, opts *DrawOptions) {
-	x, y := opts.X, opts.Y
-	w, h := spr.sizeF.W, spr.sizeF.H
-	r := opts.Rotate
-	ox, oy := opts.OriginX, opts.OriginY
-	sx, sy := opts.ScaleX, opts.ScaleY
-
-	op := spr.op
+// Draw отрисовывает спрайт на экране с учетом переданных параметров.
+func (s *Sprite) Draw(screen *ebiten.Image, index int, opts *DrawOptions) {
+	op := s.op
 	op.GeoM.Reset()
 	op.ColorM = opts.ColorM
 	op.CompositeMode = opts.CompositeMode
 
-	if spr.flippedH {
-		sx = sx * -1
+	w, h := s.sizeF.Width, s.sizeF.Height
+	sx, sy := opts.ScaleX, opts.ScaleY
+	ox, oy := opts.OriginX, opts.OriginY
+
+	if s.flippedH {
+		sx *= -1
 		ox = 1 - ox
 	}
-	if spr.flippedV {
-		sy = sy * -1
+	if s.flippedV {
+		sy *= -1
 		oy = 1 - oy
 	}
 
@@ -149,42 +140,38 @@ func (spr *Sprite) Draw(screen *ebiten.Image, index int, opts *DrawOptions) {
 		op.GeoM.Translate(w*ox, h*oy)
 	}
 
-	if r != 0 {
+	if opts.Rotate != 0 {
 		op.GeoM.Translate(-w*ox, -h*oy)
-		op.GeoM.Rotate(r)
+		op.GeoM.Rotate(opts.Rotate)
 		op.GeoM.Translate(w*ox, h*oy)
 	}
 
-	op.GeoM.Translate((x - w*ox), (y - h*oy))
-
-	subImage := spr.subImages[index]
-	screen.DrawImage(subImage, op)
+	op.GeoM.Translate(opts.X-w*ox, opts.Y-h*oy)
+	screen.DrawImage(s.subImages[index], op)
 }
 
-// DrawWithShader draws the current frame with the specified options.
-func (spr *Sprite) DrawWithShader(screen *ebiten.Image, index int, opts *DrawOptions, shaderOpts *ShaderOptions) {
-	x, y := opts.X, opts.Y
-	w, h := spr.sizeF.W, spr.sizeF.H
-	r := opts.Rotate
-	ox, oy := opts.OriginX, opts.OriginY
-	sx, sy := opts.ScaleX, opts.ScaleY
-
-	op := spr.shaderOp
+// DrawWithShader отрисовывает спрайт с использованием шейдера.
+func (s *Sprite) DrawWithShader(screen *ebiten.Image, index int, opts *DrawOptions, shaderOpts *ShaderOptions) {
+	op := s.shaderOp
 	op.GeoM.Reset()
 	op.CompositeMode = opts.CompositeMode
 	op.Uniforms = shaderOpts.Uniforms
 
-	if r != 0 {
+	w, h := s.sizeF.Width, s.sizeF.Height
+	sx, sy := opts.ScaleX, opts.ScaleY
+	ox, oy := opts.OriginX, opts.OriginY
+
+	if opts.Rotate != 0 {
 		op.GeoM.Translate(-w*ox, -h*oy)
-		op.GeoM.Rotate(r)
+		op.GeoM.Rotate(opts.Rotate)
 		op.GeoM.Translate(w*ox, h*oy)
 	}
 
-	if spr.flippedH {
-		sx = sx * -1
+	if s.flippedH {
+		sx *= -1
 	}
-	if spr.flippedV {
-		sy = sy * -1
+	if s.flippedV {
+		sy *= -1
 	}
 
 	if sx != 1 || sy != 1 {
@@ -193,19 +180,18 @@ func (spr *Sprite) DrawWithShader(screen *ebiten.Image, index int, opts *DrawOpt
 		op.GeoM.Translate(w*ox, h*oy)
 	}
 
-	op.GeoM.Translate((x - w*ox), (y - h*oy))
-
-	subImage := spr.subImages[index]
-	op.Images[0] = subImage
+	op.GeoM.Translate(opts.X-w*ox, opts.Y-h*oy)
+	op.Images[0] = s.subImages[index]
 	op.Images[1] = shaderOpts.Images[0]
 	op.Images[2] = shaderOpts.Images[1]
 	op.Images[3] = shaderOpts.Images[2]
 	screen.DrawRectShader(int(w), int(h), shaderOpts.Shader, op)
 }
 
-func (spr *Sprite) Clone() *Sprite {
-	s := *spr
-	s.op = &ebiten.DrawImageOptions{}
-	s.shaderOp = &ebiten.DrawRectShaderOptions{}
-	return &s
+// Clone создает копию спрайта.
+func (s *Sprite) Clone() *Sprite {
+	clone := *s
+	clone.op = &ebiten.DrawImageOptions{}
+	clone.shaderOp = &ebiten.DrawRectShaderOptions{}
+	return &clone
 }

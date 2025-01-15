@@ -6,143 +6,118 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Handler represents a component that can be added to a container.
+// Handler представляет интерфейс для обработки событий.
 type Handler interface{}
 
-// Drawer represents a component that can be added to a container.
+// Drawer определяет интерфейс для отрисовки элементов UI.
 type Drawer interface {
-	// Draw function draws the content of the component inside the frame.
 	Draw(screen *ebiten.Image, frame image.Rectangle, v *View)
 }
 
-// Updater represents a component that updates by one tick.
+// Updater определяет интерфейс для обновления элементов UI.
 type Updater interface {
-	// Update updates the state of the component by one tick.
 	Update(v *View)
 }
 
-// DrawHandler represents a component that can be added to a container.
-// Deprectead: use Drawer instead
+// DrawHandler определяет интерфейс для обработки событий отрисовки.
 type DrawHandler interface {
-	// HandleDraw function draws the content of the component inside the frame.
-	// The frame parameter represents the location (x,y) and size (width,height) relative to the window (0,0).
 	HandleDraw(screen *ebiten.Image, frame image.Rectangle)
 }
 
-// UpdateHandler represents a component that updates by one tick.
-// Deprectead: use Updater instead
+// UpdateHandler определяет интерфейс для обработки событий обновления.
 type UpdateHandler interface {
-	// Updater updates the state of the component by one tick.
 	HandleUpdate()
 }
 
-// ButtonHandler represents a button component.
+// ButtonHandler определяет интерфейс для обработки событий нажатия и отпускания кнопки.
 type ButtonHandler interface {
-	// HandlePress handle the event when user just started pressing the button
-	// The parameter (x, y) is the location relative to the window (0,0).
-	// touchID is the unique ID of the touch.
-	// If the button is pressed by a mouse, touchID is -1.
 	HandlePress(x, y int, t ebiten.TouchID)
-
-	// HandleRelease handle the event when user just released the button.
-	// The parameter (x, y) is the location relative to the window (0,0).
-	// The parameter isCancel is true when the touch/left click is released outside of the button.
 	HandleRelease(x, y int, isCancel bool)
 }
 
-// NotButton represents a component that is not a button.
-// TODO: update HandlePress to return bool in the next major version.
+// NotButton определяет интерфейс для элементов, которые не являются кнопками.
 type NotButton interface {
-	// IsButton returns true if the handler is a button.
 	IsButton() bool
 }
 
-// TouchHandler represents a component that handle touches.
+// TouchHandler определяет интерфейс для обработки событий касания.
 type TouchHandler interface {
-	// HandleJustPressedTouchID handles the touchID just pressed and returns true if it handles the TouchID
 	HandleJustPressedTouchID(touch ebiten.TouchID, x, y int) bool
-	// HandleJustReleasedTouchID handles the touchID just released
-	// Should be called only when it handled the TouchID when pressed
 	HandleJustReleasedTouchID(touch ebiten.TouchID, x, y int)
 }
 
-// MouseHandler represents a component that handle mouse move.
+// MouseHandler определяет интерфейс для обработки событий мыши.
 type MouseHandler interface {
-	// HandleMouse handles the mouch move and returns true if it handle the mouse move.
-	// The parameter (x, y) is the location relative to the window (0,0).
 	HandleMouse(x, y int) bool
 }
 
-// MouseLeftButtonHandler represents a component that handle mouse button left click.
+// MouseLeftButtonHandler определяет интерфейс для обработки событий левой кнопки мыши.
 type MouseLeftButtonHandler interface {
-	// HandleJustPressedMouseButtonLeft handle left mouse button click just pressed.
-	// The parameter (x, y) is the location relative to the window (0,0).
-	// It returns true if it handles the mouse move.
 	HandleJustPressedMouseButtonLeft(x, y int) bool
-	// HandleJustReleasedTouchID handles the touchID just released.
-	// The parameter (x, y) is the location relative to the window (0,0).
 	HandleJustReleasedMouseButtonLeft(x, y int)
 }
 
-// MouseEnterHandler represets a component that handle mouse enter.
+// MouseEnterLeaveHandler определяет интерфейс для обработки событий входа и выхода мыши.
 type MouseEnterLeaveHandler interface {
-	// HandleMouseEnter handles the mouse enter.
 	HandleMouseEnter(x, y int) bool
-	// HandleMouseLeave handles the mouse leave.
 	HandleMouseLeave()
 }
 
-// SwipeHandler represents different swipe directions.
+// SwipeDirection определяет направление свайпа.
 type SwipeDirection int
 
 const (
-	SwipeDirectionLeft SwipeDirection = iota
-	SwipeDirectionRight
-	SwipeDirectionUp
-	SwipeDirectionDown
+	SwipeLeft SwipeDirection = iota
+	SwipeRight
+	SwipeUp
+	SwipeDown
 )
 
-// SwipeHandler represents a component that handle swipe.
+// SwipeHandler определяет интерфейс для обработки событий свайпа.
 type SwipeHandler interface {
-	// HandleSwipe handles swipes.
 	HandleSwipe(dir SwipeDirection)
 }
 
+// handler реализует интерфейсы для обработки событий.
 type handler struct {
 	opts HandlerOpts
 }
 
-// HandlerOpts represents the options for a handler.
+// HandlerOpts содержит функции для обработки событий.
 type HandlerOpts struct {
-	Update        func(v *View)
-	Draw          func(screen *ebiten.Image, frame image.Rectangle, v *View)
-	HandlePress   func(x, y int, t ebiten.TouchID)
-	HandleRelease func(x, y int, isCancel bool)
+	Update        func(v *View)                                              // Функция для обновления.
+	Draw          func(screen *ebiten.Image, frame image.Rectangle, v *View) // Функция для отрисовки.
+	HandlePress   func(x, y int, t ebiten.TouchID)                           // Функция для обработки нажатия.
+	HandleRelease func(x, y int, isCancel bool)                              // Функция для обработки отпускания.
 }
 
-// NewHandler creates a new handler.
+// NewHandler создает новый обработчик событий.
 func NewHandler(opts HandlerOpts) Handler {
 	return &handler{opts: opts}
 }
 
+// Update вызывает функцию обновления, если она задана.
 func (h *handler) Update(v *View) {
 	if h.opts.Update != nil {
 		h.opts.Update(v)
 	}
 }
 
+// Draw вызывает функцию отрисовки, если она задана.
 func (h *handler) Draw(screen *ebiten.Image, frame image.Rectangle, v *View) {
 	if h.opts.Draw != nil {
 		h.opts.Draw(screen, frame, v)
 	}
 }
 
+// HandlePress вызывает функцию обработки нажатия, если она задана.
 func (h *handler) HandlePress(x, y int, t ebiten.TouchID) {
 	if h.opts.HandlePress != nil {
 		h.opts.HandlePress(x, y, t)
 	}
 }
 
+// HandleRelease вызывает функцию обработки отпускания, если она задана.
 func (h *handler) HandleRelease(x, y int, isCancel bool) {
 	if h.opts.HandleRelease != nil {
 		h.opts.HandleRelease(x, y, isCancel)

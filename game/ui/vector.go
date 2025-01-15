@@ -8,42 +8,42 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-type FillRectangleOptions struct {
-	Bounds image.Rectangle
-	Color  color.Color
+// FillRectOpts содержит параметры для отрисовки заполненного прямоугольника.
+type FillRectOpts struct {
+	Rect  image.Rectangle // Прямоугольник для отрисовки.
+	Color color.Color     // Цвет заливки.
 }
 
-type DrawRectangleOptions struct {
-	Bounds      image.Rectangle
-	Color       color.Color
-	StrokeWidth float32
+// DrawRectOpts содержит параметры для отрисовки контура прямоугольника.
+type DrawRectOpts struct {
+	Rect        image.Rectangle // Прямоугольник для отрисовки.
+	Color       color.Color     // Цвет контура.
+	StrokeWidth float32         // Толщина контура.
 }
 
-func FillRectangle(target *ebiten.Image, opts FillRectangleOptions) {
-	bounds := opts.Bounds
-	col := opts.Color
-
-	vector.DrawFilledRect(target,
-		float32(bounds.Min.X),
-		float32(bounds.Min.Y),
-		float32(bounds.Dx()),
-		float32(bounds.Dy()),
-		col,
-		false,
+// FillRect отрисовывает заполненный прямоугольник на целевом изображении.
+func FillRect(target *ebiten.Image, opts FillRectOpts) {
+	vector.DrawFilledRect(
+		target,
+		float32(opts.Rect.Min.X),
+		float32(opts.Rect.Min.Y),
+		float32(opts.Rect.Dx()),
+		float32(opts.Rect.Dy()),
+		opts.Color,
+		false, // Не использовать антиалиасинг для повышения производительности.
 	)
 }
 
-func DrawRectangleOutline(target *ebiten.Image, opts DrawRectangleOptions) {
-	bounds := opts.Bounds
-	strokeWidth := opts.StrokeWidth
-
-	vector.StrokeRect(target,
-		float32(bounds.Min.X),
-		float32(bounds.Min.Y),
-		float32(bounds.Dx()),
-		float32(bounds.Dy()),
-		strokeWidth,
+// DrawRectOutline отрисовывает контур прямоугольника на целевом изображении.
+func DrawRectOutline(target *ebiten.Image, opts DrawRectOpts) {
+	vector.StrokeRect(
+		target,
+		float32(opts.Rect.Min.X),
+		float32(opts.Rect.Min.Y),
+		float32(opts.Rect.Dx()),
+		float32(opts.Rect.Dy()),
+		opts.StrokeWidth,
 		opts.Color,
-		false,
+		false, // Не использовать антиалиасинг для повышения производительности.
 	)
 }

@@ -2,40 +2,41 @@ package animation
 
 import "github.com/hajimehoshi/ebiten/v2"
 
+// drawOpts содержит глобальные параметры отрисовки по умолчанию.
 var drawOpts = DrawOpts(0, 0, 0, 1, 1, 1, 0.5, 0.5)
 
-// DrawSprite draws a sprite to the screen.
-func DrawSprite(screen *ebiten.Image, spr *Sprite, index int, x, y, rot, sx, sy, ox, oy float64) {
+// DrawSprite отрисовывает спрайт на экране с указанными параметрами.
+func DrawSprite(screen *ebiten.Image, sprite *Sprite, index int, x, y, rotate, scaleX, scaleY, originX, originY float64) {
 	drawOpts.SetPos(x, y)
-	drawOpts.SetRot(rot)
-	drawOpts.SetScale(sx, sy)
-	drawOpts.SetOrigin(ox, oy)
-	spr.Draw(screen, index, drawOpts)
+	drawOpts.SetRot(rotate)
+	drawOpts.SetScale(scaleX, scaleY)
+	drawOpts.SetOrigin(originX, originY)
+	sprite.Draw(screen, index, drawOpts)
 }
 
-// DrawSpriteWithOpts draws a sprite to the screen.
-func DrawSpriteWithOpts(screen *ebiten.Image, spr *Sprite, index int, opts *DrawOptions, shaderOpts *ShaderOptions) {
+// DrawSpriteWithOpts отрисовывает спрайт на экране с использованием переданных параметров отрисовки и шейдера.
+func DrawSpriteWithOpts(screen *ebiten.Image, sprite *Sprite, index int, opts *DrawOptions, shaderOpts *ShaderOptions) {
 	if shaderOpts != nil {
-		spr.DrawWithShader(screen, index, opts, shaderOpts)
+		sprite.DrawWithShader(screen, index, opts, shaderOpts)
 	} else {
-		spr.Draw(screen, index, opts)
+		sprite.Draw(screen, index, opts)
 	}
 }
 
-// DrawAnime draws an animation to the screen.
-func DrawAnime(screen *ebiten.Image, anim *Animation, x, y, rot, sx, sy, ox, oy float64) {
+// DrawAnimation отрисовывает анимацию на экране с указанными параметрами.
+func DrawAnimation(screen *ebiten.Image, animation *Animation, x, y, rotate, scaleX, scaleY, originX, originY float64) {
 	drawOpts.SetPos(x, y)
-	drawOpts.SetRot(rot)
-	drawOpts.SetScale(sx, sy)
-	drawOpts.SetOrigin(ox, oy)
-	anim.Draw(screen, drawOpts)
+	drawOpts.SetRot(rotate)
+	drawOpts.SetScale(scaleX, scaleY)
+	drawOpts.SetOrigin(originX, originY)
+	animation.Draw(screen, drawOpts)
 }
 
-// DrawAnimeWithOpts draws an anime to the screen.
-func DrawAnimeWithOpts(screen *ebiten.Image, anim *Animation, opts *DrawOptions, shaderOpts *ShaderOptions) {
+// DrawAnimationWithOpts отрисовывает анимацию на экране с использованием переданных параметров отрисовки и шейдера.
+func DrawAnimationWithOpts(screen *ebiten.Image, animation *Animation, opts *DrawOptions, shaderOpts *ShaderOptions) {
 	if shaderOpts != nil {
-		anim.DrawWithShader(screen, opts, shaderOpts)
+		animation.DrawWithShader(screen, opts, shaderOpts)
 	} else {
-		anim.Draw(screen, opts)
+		animation.Draw(screen, opts)
 	}
 }

@@ -1,51 +1,41 @@
 package sprites
 
 import (
-	"engine/game/animation"
+	"cu/game/animation"
 	"image"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// PanelOpts содержит параметры для создания панелей.
 type PanelOpts struct {
-	Border int
-	Center int
+	Border int // Толщина границы панели.
+	Center int // Размер центральной части панели.
 }
 
-func createPanels(img *ebiten.Image, r image.Rectangle, opts PanelOpts) map[string]*animation.Sprite {
-	ret := map[string]*animation.Sprite{}
-	w, h := img.Bounds().Dx(), img.Bounds().Dy()
-	border := opts.Border
-	center := opts.Center
-	cx, cy := r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
+// createPanels создает панели из изображения на основе заданных параметров.
+func createPanels(img *ebiten.Image, rect image.Rectangle, opts PanelOpts) map[string]*animation.Sprite {
+	panels := make(map[string]*animation.Sprite)
+	// width, height := img.Bounds().Dx(), img.Bounds().Dy()
+	border, center := opts.Border, opts.Center
+	centerX, centerY := rect.Min.X+rect.Dx()/2, rect.Min.Y+rect.Dy()/2
 
-	// top left
-	g := animation.NewGrid(border, border, w, h, r.Min.X, r.Min.Y)
-	ret["top_left"] = animation.NewSprite(img, g.Frames())
-	// top
-	g = animation.NewGrid(center, border, w, h, cx-center/2, r.Min.Y)
-	ret["top"] = animation.NewSprite(img, g.Frames())
-	// top right
-	g = animation.NewGrid(border, border, w, h, r.Min.X+r.Dx()-border, r.Min.Y)
-	ret["top_right"] = animation.NewSprite(img, g.Frames())
-	// left
-	g = animation.NewGrid(border, center, w, h, r.Min.X, cy-center/2)
-	ret["left"] = animation.NewSprite(img, g.Frames())
-	// center
-	g = animation.NewGrid(center, center, w, h, cx-center/2, cy-center/2)
-	ret["center"] = animation.NewSprite(img, g.Frames())
-	// right
-	g = animation.NewGrid(border, center, w, h, r.Min.X+r.Dx()-border, cy-center/2)
-	ret["right"] = animation.NewSprite(img, g.Frames())
-	// bottom left
-	g = animation.NewGrid(border, border, w, h, r.Min.X, r.Min.Y+r.Dy()-border)
-	ret["bottom_left"] = animation.NewSprite(img, g.Frames())
-	// bottom
-	g = animation.NewGrid(center, border, w, h, cx-center/2, r.Max.Y-border)
-	ret["bottom"] = animation.NewSprite(img, g.Frames())
-	// bottom right
-	g = animation.NewGrid(border, border, w, h, r.Min.X+r.Dx()-border, r.Min.Y+r.Dy()-border)
-	ret["bottom_right"] = animation.NewSprite(img, g.Frames())
+	// createPanel создает одну панель и добавляет её в карту.
+	createPanel := func(x, y, width, height int, key string) {
+		grid := animation.NewGrid(width, height, width, height, x, y)
+		panels[key] = animation.NewSprite(img, grid.Frames())
+	}
 
-	return ret
+	// Создание панелей для каждой части UI.
+	createPanel(rect.Min.X, rect.Min.Y, border, border, "top_left")
+	createPanel(centerX-center/2, rect.Min.Y, center, border, "top")
+	createPanel(rect.Min.X+rect.Dx()-border, rect.Min.Y, border, border, "top_right")
+	createPanel(rect.Min.X, centerY-center/2, border, center, "left")
+	createPanel(centerX-center/2, centerY-center/2, center, center, "center")
+	createPanel(rect.Min.X+rect.Dx()-border, centerY-center/2, border, center, "right")
+	createPanel(rect.Min.X, rect.Min.Y+rect.Dy()-border, border, border, "bottom_left")
+	createPanel(centerX-center/2, rect.Max.Y-border, center, border, "bottom")
+	createPanel(rect.Min.X+rect.Dx()-border, rect.Min.Y+rect.Dy()-border, border, border, "bottom_right")
+
+	return panels
 }

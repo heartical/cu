@@ -2,103 +2,93 @@ package animation
 
 import "github.com/hajimehoshi/ebiten/v2"
 
-// DrawOptions represents the option for Sprite.Draw().
-// For shortcut, DrawOpts() function can be used.
+// DrawOptions содержит параметры для отрисовки спрайта.
 type DrawOptions struct {
-	X, Y             float64
-	Rotate           float64
-	ScaleX, ScaleY   float64
-	OriginX, OriginY float64
-	ColorM           ebiten.ColorM
-	CompositeMode    ebiten.CompositeMode
+	X, Y             float64              // Позиция спрайта на экране.
+	Rotate           float64              // Угол поворота спрайта.
+	ScaleX, ScaleY   float64              // Масштабирование спрайта по осям X и Y.
+	OriginX, OriginY float64              // Точка вращения и масштабирования спрайта.
+	ColorM           ebiten.ColorM        // Матрица цветовых преобразований.
+	CompositeMode    ebiten.CompositeMode // Режим композиции (наложение спрайта).
 }
 
-// SetPos sets the position of the sprite.
-func (drawOpts *DrawOptions) SetPos(x, y float64) {
-	drawOpts.X = x
-	drawOpts.Y = y
+// SetPos устанавливает позицию спрайта.
+func (opts *DrawOptions) SetPos(x, y float64) {
+	opts.X, opts.Y = x, y
 }
 
-// SetRotate sets the rotation of the sprite.
-func (drawOpts *DrawOptions) SetRot(r float64) {
-	drawOpts.Rotate = r
+// SetRot устанавливает угол поворота спрайта.
+func (opts *DrawOptions) SetRot(rotate float64) {
+	opts.Rotate = rotate
 }
 
-// SetOrigin sets the origin of the sprite.
-func (drawOpts *DrawOptions) SetOrigin(x, y float64) {
-	drawOpts.OriginX = x
-	drawOpts.OriginY = y
+// SetOrigin устанавливает точку вращения и масштабирования спрайта.
+func (opts *DrawOptions) SetOrigin(originX, originY float64) {
+	opts.OriginX, opts.OriginY = originX, originY
 }
 
-// SetScale sets the scale of the sprite.
-func (drawOpts *DrawOptions) SetScale(x, y float64) {
-	drawOpts.ScaleX = x
-	drawOpts.ScaleY = y
+// SetScale устанавливает масштабирование спрайта.
+func (opts *DrawOptions) SetScale(scaleX, scaleY float64) {
+	opts.ScaleX, opts.ScaleY = scaleX, scaleY
 }
 
-// Reset resets the DrawOptions to default values.
-func (drawOpts *DrawOptions) Reset() {
-	drawOpts.X = 0
-	drawOpts.Y = 0
-	drawOpts.Rotate = 0
-	drawOpts.ScaleX = 1
-	drawOpts.ScaleY = 1
-	drawOpts.OriginX = 0
-	drawOpts.OriginY = 0
-	drawOpts.ColorM.Reset()
-	drawOpts.CompositeMode = ebiten.CompositeModeSourceOver
+// Reset сбрасывает все параметры отрисовки к значениям по умолчанию.
+func (opts *DrawOptions) Reset() {
+	opts.X, opts.Y = 0, 0
+	opts.Rotate = 0
+	opts.ScaleX, opts.ScaleY = 1, 1
+	opts.OriginX, opts.OriginY = 0, 0
+	opts.ColorM.Reset()
+	opts.CompositeMode = ebiten.CompositeModeSourceOver
 }
 
-// ResetValues resets the DrawOptions to default values
-func (drawOpts *DrawOptions) ResetValues(x, y, rot, sx, sy, ox, oy float64) {
-	drawOpts.Reset()
-	drawOpts.SetPos(x, y)
-	drawOpts.SetRot(rot)
-	drawOpts.SetScale(sx, sy)
-	drawOpts.SetOrigin(ox, oy)
+// ResetValues сбрасывает параметры отрисовки и устанавливает новые значения.
+func (opts *DrawOptions) ResetValues(x, y, rotate, scaleX, scaleY, originX, originY float64) {
+	opts.Reset()
+	opts.SetPos(x, y)
+	opts.SetRot(rotate)
+	opts.SetScale(scaleX, scaleY)
+	opts.SetOrigin(originX, originY)
 }
 
-// ShaderOptions represents the option for Sprite.DrawWithShader()
+// ShaderOptions содержит параметры для отрисовки с использованием шейдера.
 type ShaderOptions struct {
-	Uniforms map[string]interface{}
-	Shader   *ebiten.Shader
-	Images   [3]*ebiten.Image
+	Uniforms map[string]interface{} // Uniform-переменные для шейдера.
+	Shader   *ebiten.Shader         // Шейдер для отрисовки.
+	Images   [3]*ebiten.Image       // Изображения, передаваемые в шейдер.
 }
 
-// DrawOpts returns DrawOptions pointer with specified
-// settings.
-// The paramters are x, y, rotate (in radian), scaleX, scaleY
-// originX, originY.
-// If scaleX and ScaleY is not specified the default value
-// will be 1.0, 1.0.
-// If OriginX and OriginY is not specified the default value
-// will be 0, 0
+// DrawOpts создает новый экземпляр DrawOptions с заданными параметрами.
+// Аргументы args могут содержать: [rotate, scaleX, scaleY, originX, originY].
 func DrawOpts(x, y float64, args ...float64) *DrawOptions {
-	r, sx, sy, ox, oy := 0., 1., 1., 0., 0.
+	rotate, scaleX, scaleY, originX, originY := 0.0, 1.0, 1.0, 0.0, 0.0
+
+	// Обработка аргументов в зависимости от их количества.
 	switch len(args) {
 	case 5:
-		oy = args[4]
+		originY = args[4]
 		fallthrough
 	case 4:
-		ox = args[3]
+		originX = args[3]
 		fallthrough
 	case 3:
-		sy = args[2]
+		scaleY = args[2]
 		fallthrough
 	case 2:
-		sx = args[1]
+		scaleX = args[1]
 		fallthrough
 	case 1:
-		r = args[0]
+		rotate = args[0]
 	}
+
 	return &DrawOptions{
 		X:             x,
 		Y:             y,
-		Rotate:        r,
-		ScaleX:        sx,
-		ScaleY:        sy,
-		OriginX:       ox,
-		OriginY:       oy,
+		Rotate:        rotate,
+		ScaleX:        scaleX,
+		ScaleY:        scaleY,
+		OriginX:       originX,
+		OriginY:       originY,
 		ColorM:        ebiten.ColorM{},
 		CompositeMode: ebiten.CompositeModeSourceOver,
 	}

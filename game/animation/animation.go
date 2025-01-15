@@ -1,7 +1,6 @@
 package animation
 
 import (
-	"fmt"
 	"image"
 	"log"
 	"time"
@@ -9,30 +8,31 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// imageCache представляет кэш для хранения подкадров изображений.
 type imageCache map[*ebiten.Image]map[*image.Rectangle]*ebiten.Image
 
-var _imageCache imageCache
-
-var DefaultDelta = time.Millisecond * 16
+var (
+	imageCacheMap imageCache
+	defaultDelta  = time.Millisecond * 16 // Дефолтное значение для обновления анимации.
+)
 
 func init() {
-	_imageCache = make(map[*ebiten.Image]map[*image.Rectangle]*ebiten.Image)
+	imageCacheMap = make(imageCache)
 }
 
+// parseDurations парсит длительности кадров из различных типов данных.
 func parseDurations(durations interface{}, frameCount int) []time.Duration {
 	result := make([]time.Duration, frameCount)
 	switch val := durations.(type) {
 	case time.Duration:
-		for i := 0; i < frameCount; i++ {
+		for i := range result {
 			result[i] = val
 		}
 	case []time.Duration:
-		for i := range val {
-			result[i] = val[i]
-		}
+		copy(result, val)
 	case []interface{}:
 		for i := range val {
-			result[i] = parseDurationValue(val[i])
+			result[i] = parseDuration(val[i])
 		}
 	case map[string]time.Duration:
 		for key, duration := range val {
@@ -45,53 +45,48 @@ func parseDurations(durations interface{}, frameCount int) []time.Duration {
 		for key, duration := range val {
 			min, max, step := parseInterval(key)
 			for i := min; i <= max; i += step {
-				result[i-1] = parseDurationValue(duration)
+				result[i-1] = parseDuration(duration)
 			}
 		}
-	case interface{}:
-		for i := 0; i < frameCount; i++ {
-			result[i] = parseDurationValue(val)
-		}
 	default:
-		log.Fatal(fmt.Sprintf("failed to parse durations: type=%T val=%+v", durations, durations))
+		log.Fatalf("failed to parse durations: type=%T val=%+v", durations, durations)
 	}
 	return result
 }
 
-func parseDurationValue(value interface{}) time.Duration {
+// parseDuration парсит длительность из различных типов данных.
+func parseDuration(value interface{}) time.Duration {
 	switch val := value.(type) {
 	case time.Duration:
 		return val
-	case int:
-		return time.Millisecond * time.Duration(val)
-	case float64:
-		return time.Millisecond * time.Duration(val)
+	case int, float64:
+		return time.Millisecond * time.Duration(val.(int))
 	default:
-		log.Fatal(fmt.Sprintf("failed to parse duration value: %+v", value))
+		log.Fatalf("failed to parse duration value: %+v", value)
 	}
 	return 0
 }
 
+// parseIntervals преобразует длительности кадров в интервалы времени.
 func parseIntervals(durations []time.Duration) ([]time.Duration, time.Duration) {
 	result := []time.Duration{0}
-	var time time.Duration = 0
+	var total time.Duration
 	for _, v := range durations {
-		time += v
-		result = append(result, time)
+		total += v
+		result = append(result, total)
 	}
-	return result, time
+	return result, total
 }
 
-// Status represents the animation status.
+// Status представляет состояние анимации.
 type Status int
 
 const (
-	Playing = iota
-	Paused
+	Playing Status = iota // Анимация воспроизводится.
+	Paused                // Анимация на паузе.
 )
 
-// Animation represents an animation created from specified frames
-// and an *ebiten.Image
+// Animation представляет анимацию, состоящую из кадров спрайта.
 type Animation struct {
 	sprite        *Sprite
 	position      int
@@ -103,225 +98,198 @@ type Animation struct {
 	status        Status
 }
 
-// OnLoop is callback function which representing
-// one of the animation methods.
-// it will be called every time an animation "loops".
-//
-// It will have two parameters: the animation instance,
-// and how many loops have been elapsed.
-//
-// The value would be Nop (No operation) if there's nothing
-// to do except for looping the animation.
-//
-// The most usual value (apart from none) is the string 'pauseAtEnd'.
-// It will make the animation loop once and then pause
-// and stop on the last frame.
-type OnLoop func(anim *Animation, loops int)
+// OnLoop представляет функцию обратного вызова, которая вызывается при завершении цикла анимации.
+type OnLoop func(*Animation, int)
 
-// Nop does nothing.
-func Nop(anim *Animation, loops int) {}
+// Nop — пустая функция обратного вызова.
+func Nop(*Animation, int) {}
 
-// Pause pauses the animation on loop finished.
-func Pause(anim *Animation, loops int) {
+// Pause приостанавливает анимацию при завершении цикла.
+func Pause(anim *Animation, _ int) {
 	anim.Pause()
 }
 
-// PauseAtEnd pauses the animation and set the position to
-// the last frame.
-func PauseAtEnd(anim *Animation, loops int) {
+// PauseAtEnd приостанавливает анимацию в конце цикла.
+func PauseAtEnd(anim *Animation, _ int) {
 	anim.PauseAtEnd()
 }
 
-// PauseAtStart pauses the animation and set the position to
-// the first frame.
-func PauseAtStart(anim *Animation, loops int) {
+// PauseAtStart приостанавливает анимацию в начале цикла.
+func PauseAtStart(anim *Animation, _ int) {
 	anim.PauseAtStart()
 }
 
-// NewAnimation returns a new animation object
-//
-// durations is a time.Duration or a []time.Duration or
-// a map[string]time.Duration.
-// When it's a time.Duration, it represents the duration of
-// all frames in the animation.
-// When it's a []time.Duration, it can represent different
-// durations for different frames.
-// You can specify durations for all frames individually,
-// like this: []time.Duration { 100 * time.Millisecond,
-// 100 * time.Millisecond } or you can specify durations for
-// ranges of frames: map[string]time.Duration { "1-2":
-// 100 * time.Millisecond, "3-5": 200 * time.Millisecond }.
+// NewAnimation создает новую анимацию на основе спрайта и длительностей кадров.
 func NewAnimation(sprite *Sprite, durations interface{}, onLoop ...OnLoop) *Animation {
-	_durations := parseDurations(durations, sprite.length)
-	intervals, totalDuration := parseIntervals(_durations)
+	durs := parseDurations(durations, sprite.Length())
+	intervals, total := parseIntervals(durs)
 	ol := Nop
 	if len(onLoop) > 0 {
 		ol = onLoop[0]
 	}
-	anim := &Animation{
+	return &Animation{
 		sprite:        sprite,
-		position:      0,
-		timer:         0,
-		durations:     _durations,
+		durations:     durs,
 		intervals:     intervals,
-		totalDuration: totalDuration,
+		totalDuration: total,
 		onLoop:        ol,
 		status:        Playing,
 	}
-	return anim
 }
 
-// New creates a new animation from the specified image
+// New создает новую анимацию на основе изображения, кадров и длительностей.
 func New(img *ebiten.Image, frames []*image.Rectangle, durations interface{}, onLoop ...OnLoop) *Animation {
-	spr := NewSprite(img, frames)
-	return NewAnimation(spr, durations, onLoop...)
+	return NewAnimation(NewSprite(img, frames), durations, onLoop...)
 }
 
-// Clone return a copied animation object.
+// Clone создает копию анимации.
 func (anim *Animation) Clone() *Animation {
-	new := *anim
-	return &new
+	return &Animation{
+		sprite:        anim.sprite,
+		position:      anim.position,
+		timer:         anim.timer,
+		durations:     anim.durations,
+		intervals:     anim.intervals,
+		totalDuration: anim.totalDuration,
+		onLoop:        anim.onLoop,
+		status:        anim.status,
+	}
 }
 
-// SetOnLoop sets the callback function which representing
+// SetOnLoop устанавливает функцию обратного вызова при завершении цикла анимации.
 func (anim *Animation) SetOnLoop(onLoop OnLoop) {
 	anim.onLoop = onLoop
 }
 
+// IsEnd проверяет, завершена ли анимация.
 func (anim *Animation) IsEnd() bool {
-	if anim.status == Paused && anim.position == anim.sprite.length-1 {
-		return true
-	}
-	return false
+	return anim.status == Paused && anim.position == anim.sprite.Length()-1
 }
 
+// seekFrameIndex ищет индекс кадра на основе текущего времени.
 func seekFrameIndex(intervals []time.Duration, timer time.Duration) int {
-	high, low, i := len(intervals)-2, 0, 0
+	low, high := 0, len(intervals)-2
 	for low <= high {
-		i = (low + high) / 2
-		if timer >= intervals[i+1] {
-			low = i + 1
-		} else if timer < intervals[i] {
-			high = i - 1
+		mid := (low + high) / 2
+		if timer >= intervals[mid+1] {
+			low = mid + 1
+		} else if timer < intervals[mid] {
+			high = mid - 1
 		} else {
-			return i
+			return mid
 		}
 	}
-	return i
+	return low
 }
 
-// Update updates the animation.
+// Update обновляет анимацию с использованием дефолтного времени.
 func (anim *Animation) Update() {
-	anim.UpdateWithDelta(DefaultDelta)
+	anim.UpdateWithDelta(defaultDelta)
 }
 
-// UpdateWithDelta updates the animation with the specified delta.
-func (anim *Animation) UpdateWithDelta(elapsedTime time.Duration) {
-	if anim.status != Playing || anim.sprite.length <= 1 {
+// UpdateWithDelta обновляет анимацию с учетом прошедшего времени.
+func (anim *Animation) UpdateWithDelta(elapsed time.Duration) {
+	if anim.status != Playing || anim.sprite.Length() <= 1 {
 		return
 	}
-	anim.timer += elapsedTime
+	anim.timer += elapsed
 	loops := anim.timer / anim.totalDuration
 	if loops != 0 {
-		anim.timer = anim.timer - anim.totalDuration*loops
-		(anim.onLoop)(anim, int(loops))
+		anim.timer -= anim.totalDuration * loops
+		anim.onLoop(anim, int(loops))
 	}
 	anim.position = seekFrameIndex(anim.intervals, anim.timer)
 }
 
-// SetDurations sets the durations of the animation.
+// SetDurations устанавливает новые длительности кадров.
 func (anim *Animation) SetDurations(durations interface{}) {
-	_durations := parseDurations(durations, anim.sprite.length)
-	anim.durations = _durations
-	anim.intervals, anim.totalDuration = parseIntervals(_durations)
+	durs := parseDurations(durations, anim.sprite.Length())
+	anim.durations = durs
+	anim.intervals, anim.totalDuration = parseIntervals(durs)
 	anim.timer = 0
 }
 
-// Status returns the status of the animation.
+// Status возвращает текущее состояние анимации.
 func (anim *Animation) Status() Status {
 	return anim.status
 }
 
-// Pause pauses the animation.
+// Pause приостанавливает анимацию.
 func (anim *Animation) Pause() {
 	anim.status = Paused
 }
 
-// Position returns the current position of the frame.
-// The position counts from 1 (not 0).
+// Position возвращает текущий кадр анимации.
 func (anim *Animation) Position() int {
 	return anim.position + 1
 }
 
-// Duration returns the current durations of each frames.
+// Durations возвращает длительности кадров анимации.
 func (anim *Animation) Durations() []time.Duration {
 	return anim.durations
 }
 
-// TotalDuration returns the total duration of the animation.
+// TotalDuration возвращает общую длительность анимации.
 func (anim *Animation) TotalDuration() time.Duration {
 	return anim.totalDuration
 }
 
-// Size returns the size of the current frame.
+// Size возвращает размер спрайта анимации.
 func (anim *Animation) Size() (int, int) {
 	return anim.sprite.Size()
 }
 
-// W is a shortcut for Size().X.
-func (anim *Animation) W() int {
-	return anim.sprite.W()
+// Width возвращает ширину спрайта анимации.
+func (anim *Animation) Width() int {
+	return anim.sprite.Width()
 }
 
-// H is a shortcut for Size().Y.
-func (anim *Animation) H() int {
-	return anim.sprite.H()
+// Height возвращает высоту спрайта анимации.
+func (anim *Animation) Height() int {
+	return anim.sprite.Height()
 }
 
-// Timer returns the current accumulated times of current frame.
+// Timer возвращает текущее время анимации.
 func (anim *Animation) Timer() time.Duration {
 	return anim.timer
 }
 
-// Sprite returns the sprite of the animation.
+// Sprite возвращает спрайт анимации.
 func (anim *Animation) Sprite() *Sprite {
 	return anim.sprite
 }
 
-// GoToFrame sets the position of the animation and
-// sets the timer at the start of the frame.
+// GoToFrame переходит к указанному кадру анимации.
 func (anim *Animation) GoToFrame(position int) {
 	anim.position = position - 1
 	anim.timer = anim.intervals[anim.position]
 }
 
-// PauseAtEnd pauses the animation and set the position
-// to the last frame.
+// PauseAtEnd приостанавливает анимацию в конце.
 func (anim *Animation) PauseAtEnd() {
-	anim.position = anim.sprite.length - 1
+	anim.position = anim.sprite.Length() - 1
 	anim.timer = anim.totalDuration
 	anim.Pause()
 }
 
-// PauseAtStart pauses the animation and set the position
-// to the first frame.
+// PauseAtStart приостанавливает анимацию в начале.
 func (anim *Animation) PauseAtStart() {
 	anim.position = 0
 	anim.timer = 0
 	anim.status = Paused
 }
 
-// Resume resumes the animation
+// Resume возобновляет воспроизведение анимации.
 func (anim *Animation) Resume() {
 	anim.status = Playing
 }
 
-// Draw draws the animation with the specified option parameters.
+// Draw отрисовывает текущий кадр анимации на экране.
 func (anim *Animation) Draw(screen *ebiten.Image, opts *DrawOptions) {
 	anim.sprite.Draw(screen, anim.position, opts)
 }
 
-// DrawWithShader draws the animation with the specified option parameters.
+// DrawWithShader отрисовывает текущий кадр анимации с использованием шейдера.
 func (anim *Animation) DrawWithShader(screen *ebiten.Image, opts *DrawOptions, shaderOpts *ShaderOptions) {
 	anim.sprite.DrawWithShader(screen, anim.position, opts, shaderOpts)
 }

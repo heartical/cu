@@ -3,21 +3,23 @@ package sprites
 import (
 	"bytes"
 	"encoding/xml"
-	"engine/game/animation"
 	"fmt"
 	"image"
 
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+
+	"cu/game/animation"
 )
 
-var (
-	sprites = map[string]*animation.Sprite{}
-)
+// sprites хранит загруженные спрайты.
+var sprites = make(map[string]*animation.Sprite)
 
+// textureAtlas представляет структуру XML-атласа текстур.
 type textureAtlas struct {
 	SubTextures []subTexture `xml:"SubTexture"`
 }
 
+// subTexture представляет отдельную текстуру в атласе.
 type subTexture struct {
 	Name   string `xml:"name,attr"`
 	X      int    `xml:"x,attr"`
@@ -26,44 +28,48 @@ type subTexture struct {
 	Height int    `xml:"height,attr"`
 }
 
+// LoadOpts содержит параметры для загрузки спрайтов.
 type LoadOpts struct {
 	PanelOpts map[string]PanelOpts
 }
 
-func LoadSprites(xmlPath []byte, imgPath []byte, opts LoadOpts) {
+// LoadSprites загружает спрайты из XML-атласа и изображения.
+func LoadSprites(xmlData, imgData []byte, opts LoadOpts) {
 	var atlas textureAtlas
-	if err := xml.Unmarshal(xmlPath, &atlas); err != nil {
-		panic(err)
+	if err := xml.Unmarshal(xmlData, &atlas); err != nil {
+		panic(fmt.Sprintf("не удалось распарсить XML: %v", err))
 	}
 
-	img, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(imgPath))
+	img, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(imgData))
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("не удалось загрузить изображение: %v", err))
 	}
 
-	rects := map[string]image.Rectangle{}
-	for _, s := range atlas.SubTextures {
-		g := animation.NewGrid(s.Width, s.Height, img.Bounds().Dx(), img.Bounds().Dy(), s.X, s.Y)
-		rect := image.Rect(s.X, s.Y, s.X+s.Width, s.Y+s.Height)
-		sprites[s.Name] = animation.NewSprite(img, g.Frames())
-		rects[s.Name] = rect
+	rects := make(map[string]image.Rectangle)
+	for _, subTex := range atlas.SubTextures {
+		rect := image.Rect(subTex.X, subTex.Y, subTex.X+subTex.Width, subTex.Y+subTex.Height)
+		grid := animation.NewGrid(subTex.Width, subTex.Height, img.Bounds().Dx(), img.Bounds().Dy(), subTex.X, subTex.Y)
+		sprites[subTex.Name] = animation.NewSprite(img, grid.Frames())
+		rects[subTex.Name] = rect
 	}
 
-	for k, o := range opts.PanelOpts {
-		r, ok := rects[k]
+	for key, panelOpts := range opts.PanelOpts {
+		rect, ok := rects[key]
 		if !ok {
-			panic("panel not found: " + k)
+			panic(fmt.Sprintf("панель не найдена: %s", key))
 		}
-		panels := createPanels(img, r, o)
-		for kk, v := range panels {
-			sprites[fmt.Sprintf("%s_%s", k, kk)] = v
+		panels := createPanels(img, rect, panelOpts)
+		for panelKey, panel := range panels {
+			sprites[fmt.Sprintf("%s_%s", key, panelKey)] = panel
 		}
 	}
 }
 
+// Get возвращает спрайт по имени.
 func Get(name string) *animation.Sprite {
-	if s, ok := sprites[name]; ok {
-		return s
+	sprite, ok := sprites[name]
+	if !ok {
+		panic(fmt.Sprintf("спрайт не найден: %s", name))
 	}
-	panic("sprite not found: " + name)
+	return sprite
 }

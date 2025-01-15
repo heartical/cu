@@ -8,6 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// child представляет дочерний элемент UI, который может обрабатывать события касания, свайпа и нажатия кнопок.
 type child struct {
 	absolute                 bool
 	item                     *View
@@ -19,6 +20,7 @@ type child struct {
 	swipe
 }
 
+// swipe содержит информацию о свайпе.
 type swipe struct {
 	downX, downY int
 	upX, upY     int
@@ -28,9 +30,9 @@ type swipe struct {
 	swipeTouchID ebiten.TouchID
 }
 
-func (c *child) HandleJustPressedTouchID(
-	frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
-	var result = false
+// HandleJustPressedTouchID обрабатывает событие начала касания.
+func (c *child) HandleJustPressedTouchID(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
+	result := false
 	if c.checkButtonHandlerStart(frame, touchID, x, y) {
 		result = true
 	}
@@ -41,81 +43,75 @@ func (c *child) HandleJustPressedTouchID(
 	return result
 }
 
-func (c *child) HandleJustReleasedTouchID(
-	frame *image.Rectangle, touchID ebiten.TouchID, x, y int) {
+// HandleJustReleasedTouchID обрабатывает событие окончания касания.
+func (c *child) HandleJustReleasedTouchID(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) {
 	c.checkTouchHandlerEnd(frame, touchID, x, y)
 	c.checkButtonHandlerEnd(frame, touchID, x, y)
 	c.checkSwipeHandlerEnd(frame, touchID, x, y)
 }
 
+// checkTouchHandlerStart проверяет и обрабатывает начало касания для TouchHandler.
 func (c *child) checkTouchHandlerStart(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
-	touchHandler, ok := c.item.Handler.(TouchHandler)
-	if ok {
-		if isInside(frame, x, y) {
-			if touchHandler.HandleJustPressedTouchID(touchID, x, y) {
-				c.handledTouchID = touchID
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (c *child) checkTouchHandlerEnd(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) {
-	touchHandler, ok := c.item.Handler.(TouchHandler)
-	if ok {
-		if c.handledTouchID == touchID {
-			touchHandler.HandleJustReleasedTouchID(touchID, x, y)
-			c.handledTouchID = -1
-		}
-	}
-}
-
-func (c *child) checkSwipeHandlerStart(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
-	_, ok := c.item.Handler.(SwipeHandler)
-	if ok {
-		if isInside(frame, x, y) {
-			c.swipeTouchID = touchID
-			c.swipe.downTime = time.Now()
-			c.swipe.downX, c.swipe.downY = x, y
+	if handler, ok := c.item.Handler.(TouchHandler); ok && isInside(frame, x, y) {
+		if handler.HandleJustPressedTouchID(touchID, x, y) {
+			c.handledTouchID = touchID
 			return true
 		}
 	}
 	return false
 }
 
+// checkTouchHandlerEnd проверяет и обрабатывает окончание касания для TouchHandler.
+func (c *child) checkTouchHandlerEnd(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) {
+	if handler, ok := c.item.Handler.(TouchHandler); ok && c.handledTouchID == touchID {
+		handler.HandleJustReleasedTouchID(touchID, x, y)
+		c.handledTouchID = -1
+	}
+}
+
+// checkSwipeHandlerStart проверяет и обрабатывает начало свайпа.
+func (c *child) checkSwipeHandlerStart(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
+	if _, ok := c.item.Handler.(SwipeHandler); ok && isInside(frame, x, y) {
+		c.swipeTouchID = touchID
+		c.downTime = time.Now()
+		c.downX, c.downY = x, y
+		return true
+	}
+	return false
+}
+
+// checkSwipeHandlerEnd проверяет и обрабатывает окончание свайпа.
 func (c *child) checkSwipeHandlerEnd(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
-	swipeHandler, ok := c.item.Handler.(SwipeHandler)
-	if ok {
-		if c.swipeTouchID != touchID {
-			return false
-		}
+	if handler, ok := c.item.Handler.(SwipeHandler); ok && c.swipeTouchID == touchID {
 		c.swipeTouchID = -1
 		c.upTime = time.Now()
 		c.upX, c.upY = x, y
 		if c.checkSwipe() {
-			swipeHandler.HandleSwipe(c.swipeDir)
+			handler.HandleSwipe(c.swipeDir)
 			return true
 		}
 	}
 	return false
 }
 
-const swipeThresholdDist = 50.
-const swipeThresholdTime = time.Millisecond * 300
+const (
+	swipeThresholdDist = 50.0                   // Минимальное расстояние для распознавания свайпа.
+	swipeThresholdTime = time.Millisecond * 300 // Максимальное время для распознавания свайпа.
+)
 
+// checkSwipe проверяет, был ли выполнен свайп.
 func (c *child) checkSwipe() bool {
-	dur := c.upTime.Sub(c.downTime)
-	if dur > swipeThresholdTime {
+	duration := c.upTime.Sub(c.downTime)
+	if duration > swipeThresholdTime {
 		return false
 	}
 
 	deltaX := float64(c.downX - c.upX)
 	if math.Abs(deltaX) >= swipeThresholdDist {
 		if deltaX > 0 {
-			c.swipeDir = SwipeDirectionLeft
+			c.swipeDir = SwipeLeft
 		} else {
-			c.swipeDir = SwipeDirectionRight
+			c.swipeDir = SwipeRight
 		}
 		return true
 	}
@@ -123,9 +119,9 @@ func (c *child) checkSwipe() bool {
 	deltaY := float64(c.downY - c.upY)
 	if math.Abs(deltaY) >= swipeThresholdDist {
 		if deltaY > 0 {
-			c.swipeDir = SwipeDirectionUp
+			c.swipeDir = SwipeUp
 		} else {
-			c.swipeDir = SwipeDirectionDown
+			c.swipeDir = SwipeDown
 		}
 		return true
 	}
@@ -133,44 +129,35 @@ func (c *child) checkSwipe() bool {
 	return false
 }
 
+// checkButtonHandlerStart проверяет и обрабатывает начало нажатия кнопки.
 func (c *child) checkButtonHandlerStart(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) bool {
-	button, ok := c.item.Handler.(ButtonHandler)
-	if ok {
-		for {
-			if button, ok := c.item.Handler.(NotButton); ok {
-				if !button.IsButton() {
-					break
-				}
-			}
-			if isInside(frame, x, y) {
-				if !c.isButtonPressed {
-					c.isButtonPressed = true
-					c.handledTouchID = touchID
-					button.HandlePress(x, y, touchID)
-				}
-				return true
-			} else if c.handledTouchID == touchID {
-				c.handledTouchID = -1
-			}
-			break
+	if button, ok := c.item.Handler.(ButtonHandler); ok {
+		if notButton, ok := c.item.Handler.(NotButton); ok && !notButton.IsButton() {
+			return false
+		}
+		if isInside(frame, x, y) && !c.isButtonPressed {
+			c.isButtonPressed = true
+			c.handledTouchID = touchID
+			button.HandlePress(x, y, touchID)
+			return true
+		} else if c.handledTouchID == touchID {
+			c.handledTouchID = -1
 		}
 	}
 	return false
 }
 
+// checkButtonHandlerEnd проверяет и обрабатывает окончание нажатия кнопки.
 func (c *child) checkButtonHandlerEnd(frame *image.Rectangle, touchID ebiten.TouchID, x, y int) {
-	button, ok := c.item.Handler.(ButtonHandler)
-	if ok {
-		if c.handledTouchID == touchID {
-			if c.isButtonPressed {
-				c.isButtonPressed = false
-				c.handledTouchID = -1
-				if x == 0 && y == 0 {
-					button.HandleRelease(x, y, false)
-				} else {
-					button.HandleRelease(x, y, !isInside(frame, x, y))
-				}
-			}
-		}
+	if button, ok := c.item.Handler.(ButtonHandler); ok && c.handledTouchID == touchID && c.isButtonPressed {
+		c.isButtonPressed = false
+		c.handledTouchID = -1
+		isCancel := !(x == 0 && y == 0) && !isInside(frame, x, y)
+		button.HandleRelease(x, y, isCancel)
 	}
 }
+
+// isInside проверяет, находится ли точка (x, y) внутри прямоугольника frame.
+// func isInside(frame *image.Rectangle, x, y int) bool {
+// 	return frame != nil && x >= frame.Min.X && x <= frame.Max.X && y >= frame.Min.Y && y <= frame.Max.Y
+// }
